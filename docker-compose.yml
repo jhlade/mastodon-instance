@@ -33,19 +33,19 @@ services:
 
   redis:
     restart: always
-    image: redis:7-alpine
+    image: 'valkey/valkey:7.2-alpine'
     networks:
       - internal_network
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'valkey-cli', 'ping']
     volumes:
       - db-redis:/data
 
   redis-cache:
-    image: redis:7-alpine
+    image: 'valkey/valkey:7.2-alpine'
     restart: always
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'valkey-cli', 'ping']
     networks:
       - internal_network
 
