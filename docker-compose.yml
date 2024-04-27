@@ -99,7 +99,6 @@ services:
       - elasticsearch
     volumes:
       - data-uploads:/mastodon/public/system
-      - './provision.sh:/provision.sh:ro'
 
   streaming:
     image: 'tootsuite/mastodon:${MASTODON_VER}'
@@ -153,7 +152,6 @@ services:
     volumes:
       - data-uploads:/mastodon/public/system
       - data-web:/web
-      - './provision.sh:/provision.sh:ro'
 
 networks:
   external_network:
@@ -186,5 +184,4 @@ volumes:
       type: none
       device: ./data/elasticsearch
       o: bind
-
 
