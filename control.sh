@@ -145,6 +145,9 @@ mi_prepare() {
 	echo "OTP_SECRET=${__S_OTP}" >> ./env/app.env
 	echo "VAPID_PRIVATE_KEY=${__S_VAP_PRI}" >> ./env/app.env
 	echo "VAPID_PUBLIC_KEY=${__S_VAP_PUB}" >> ./env/app.env
+	
+	# Trusted proxy in Docker
+	echo "TRUSTED_PROXY_IP=127.0.0.1/32,172.16.0.0/12" >> ./env/app.env
 
 	[ ! -s ./env/app.env ] && { echo "[ ! ] Failed to create application environment file."; exit 1; }
 	echo "[ i ] Application environment file created."
