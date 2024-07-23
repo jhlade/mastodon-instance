@@ -6,18 +6,18 @@ Dockerized Mastodon instance - multiple instances behind master front proxy
 **Usage:**
 
 - Create a new instance
-`./prepare.sh <domain.tld> <admin_username> <admin-email>`
+`./control.sh prepare <domain.tld> <admin_username> <admin-email>`
 
 - Remove everything
-`./wipe.sh`
+`./control.sh wipe`
 
 - Start instance
-`./run.sh`
+`./control.sh start`
 
 - Stop instance
-`./stop.sh`
+`./control.sh stop`
 
 - Update to specific tag
-`./update.sh <new mastodon version, ie. v4.2.8>`
+`./constrol.sh update <new mastodon version, ie. v4.2.10>`
 
 
