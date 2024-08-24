@@ -219,7 +219,7 @@ case "$1" in
   		mi_update "$2"
   	;;
   backup)
-  		mi_backup_db
+  		mi_backup_pg
     ;;
   prepare)
   		[ $# -ne 4 ] && { echo "Usage: $0 prepare <my-domain.tld> <admin_username> <admin-email@domain.tld>"; exit 1; }
