@@ -18,6 +18,6 @@ Dockerized Mastodon instance - multiple instances behind master front proxy
 `./control.sh stop`
 
 - Update to specific tag
-`./constrol.sh update <new mastodon version, ie. v4.2.10>`
+`./constrol.sh update <new mastodon version, ie. v4.2.12>`
 
 

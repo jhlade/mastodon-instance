@@ -38,6 +38,27 @@ mi_wipe() {
 	chmod 0600 ./env/smtp.env
 }
 
+# BACKUP DATABASE
+mi_backup_pg() {
+	mkdir -p ${_DATA}/backup
+	${_DC} exec -it postgresql pg_dumpall -U mastodon > ${_DATA}/backup/data.sql
+}
+
+# RESTORE DATABASE
+mi_restore_pg() {
+	${_DC} exec -iT postgresql psql -U mastodon < ${_DATA}/backup/data.sql
+}
+
+# UPGRADE POSTGRESQL
+mi_upgrade_pg() {
+	mi_backup_pg
+	${_DC} down
+	sleep 5
+	${_DC} up postgresql -d
+	mi_restore_pg
+	${_DC} up -d
+}
+
 # UPDATE MASTODON
 mi_update() {
 	echo "" > .env
@@ -50,13 +71,14 @@ mi_update() {
 	sleep 10
 	${_DC} run --rm control bundle exec rake db:migrate
 	${_DC} up -d
+	echo "[i] Update complete. You might want to run 'docker-compose run --rm control bin/tootctl search deploy'.";
 }
 
 # PREPARE INSTANCE
 mi_prepare() {
 
 	# structure
-	mkdir -p ${_DATA}/{web,elasticsearch,postgresql,redis}
+	mkdir -p ${_DATA}/{web,elasticsearch,postgresql,redis,backup}
 	mkdir -p ${_DATA}/web/{assets,system}
 	chown -R 991:991 ${_DATA}/web
 
@@ -73,7 +95,6 @@ mi_prepare() {
 	echo "" > ./env/db.env
 
 	__PG_HOST="postgresql"
-	#__PG_ADMIN="mastodon"
 	__PG_USER="mastodon"
 	__PG_DB="mastodon_production"
 
@@ -175,7 +196,7 @@ mi_prepare() {
 		${_DC} run --rm control bin/tootctl search deploy
 		${_DC} run --rm control bin/tootctl accounts create $MASTODON_ADMIN_USERNAME --email $MASTODON_ADMIN_EMAIL --confirmed --role Owner
 
-		echo "[ i ] Provisioning done"
+		echo "[ i ] Provisioning done. Check env/app.env for additional configuration."
 		touch "$CHECK"
 	fi
 
@@ -197,12 +218,15 @@ case "$1" in
   		[ $# -ne 2 ] && { echo "Usage: $0 update <mastodon version>"; exit 1; }
   		mi_update "$2"
   	;;
+  backup)
+  		mi_backup_db
+    ;;
   prepare)
   		[ $# -ne 4 ] && { echo "Usage: $0 prepare <my-domain.tld> <admin_username> <admin-email@domain.tld>"; exit 1; }
   		mi_prepare "$2" "$3" "$4"
   	;;
   *)
-  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|prepare}"
+  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|prepare|backup}"
   exit 1
   ;;
 esac
