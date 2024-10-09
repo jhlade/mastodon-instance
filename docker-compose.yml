@@ -9,9 +9,9 @@ services:
     networks:
       - internal_network
       - external_network
-#    depends_on:
+    depends_on:
+       - streaming
 #      - web
-#      - streaming
 #      - sidekiq
 
   postgresql:
@@ -78,7 +78,7 @@ services:
         hard: 65536
 
   web:
-    image: 'tootsuite/mastodon:${MASTODON_VER}'
+    image: 'ghcr.io/mastodon/mastodon:${MASTODON_VER}'
     restart: always
     env_file:
       - ./env/app.env
@@ -99,7 +99,7 @@ services:
       - data-uploads:/mastodon/public/system
 
   streaming:
-    image: 'tootsuite/mastodon:${MASTODON_VER}'
+    image: 'ghcr.io/mastodon/mastodon-streaming:${MASTODON_VER}'
     restart: always
     env_file:
       - ./env/app.env
@@ -117,7 +117,7 @@ services:
       - redis-cache
 
   sidekiq:
-    image: 'tootsuite/mastodon:${MASTODON_VER}'
+    image: 'ghcr.io/mastodon/mastodon:${MASTODON_VER}'
     restart: always
     env_file:
       - ./env/app.env
@@ -137,7 +137,7 @@ services:
       test: ['CMD-SHELL', "ps aux | grep '[s]idekiq\ 6' || false"]
 
   control:
-    image: 'tootsuite/mastodon:${MASTODON_VER}'
+    image: 'ghcr.io/mastodon/mastodon:${MASTODON_VER}'
     env_file:
       - ./env/app.env
       - ./env/db.env

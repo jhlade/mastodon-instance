@@ -18,6 +18,10 @@ Dockerized Mastodon instance - multiple instances behind master front proxy
 `./control.sh stop`
 
 - Update to specific tag
-`./constrol.sh update <new mastodon version, ie. v4.2.12>`
+`./constrol.sh update <new mastodon version, ie. v4.3.0>`
 
+**Update to 4.3.0 from 4.2.x:**
+Run
+`docker-compose run --rm control bin/rails db:encryption:init`
 
+and insert newly generated keys to your `.env/app.env` first.

@@ -167,6 +167,12 @@ mi_prepare() {
 	echo "VAPID_PRIVATE_KEY=${__S_VAP_PRI}" >> ./env/app.env
 	echo "VAPID_PUBLIC_KEY=${__S_VAP_PUB}" >> ./env/app.env
 	
+	# active record secrets
+	# TODO - generate actual keys
+	echo "ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=" >> ./env/app.env
+	echo "ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=" >> ./env/app.env
+	echo "ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=" >> ./env/app.env
+	
 	# Trusted proxy in Docker
 	echo "TRUSTED_PROXY_IP=127.0.0.1/32,172.16.0.0/12" >> ./env/app.env
 
