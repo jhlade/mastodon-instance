@@ -227,6 +227,10 @@ case "$1" in
   backup)
   		mi_backup_pg
     ;;
+  init)
+        [ $# -ne 4 ] && { echo "Usage: $0 init <my-domain.tld> <admin_username> <admin-email@domain.tld>"; exit 1; }
+  		mi_prepare "$2" "$3" "$4"
+    ;;  
   prepare)
   		[ $# -ne 4 ] && { echo "Usage: $0 prepare <my-domain.tld> <admin_username> <admin-email@domain.tld>"; exit 1; }
   		mi_prepare "$2" "$3" "$4"
