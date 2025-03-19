@@ -1,7 +1,8 @@
 
 ## mastodon-instance
 Dockerized Mastodon instance - multiple instances behind master front proxy
-(and/or behind cascading proxies). Optimized for Joutsen Bulwark environment.
+(and/or behind cascading proxies). Optimized for Joutsen Bulwark environment
+running Podman on Linux.
 
 **Usage:**
 

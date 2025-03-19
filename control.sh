@@ -174,7 +174,7 @@ mi_prepare() {
 	echo "ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=" >> ./env/app.env
 	
 	# Trusted proxy in Docker
-	echo "TRUSTED_PROXY_IP=127.0.0.1/32,172.16.0.0/12" >> ./env/app.env
+	echo "TRUSTED_PROXY_IP=127.0.0.1/32,172.16.0.0/12,10.89.0.0/15" >> ./env/app.env
 
 	[ ! -s ./env/app.env ] && { echo "[ ! ] Failed to create application environment file."; exit 1; }
 	echo "[ i ] Application environment file created."
@@ -236,7 +236,7 @@ case "$1" in
   		mi_prepare "$2" "$3" "$4"
   	;;
   *)
-  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|prepare|backup}"
+  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|init|backup}"
   exit 1
   ;;
 esac
