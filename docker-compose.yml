@@ -31,7 +31,7 @@ services:
 
   redis:
     restart: always
-    image: 'valkey/valkey:8.0-alpine'
+    image: 'valkey/valkey:9-alpine'
     networks:
       - internal_network
     healthcheck:
@@ -40,7 +40,7 @@ services:
       - ./data/redis:/data
 
   redis-cache:
-    image: 'valkey/valkey:8.0-alpine'
+    image: 'valkey/valkey:9-alpine'
     restart: always
     healthcheck:
       test: ['CMD', 'valkey-cli', 'ping']
