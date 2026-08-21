@@ -1,33 +1,63 @@
 #!/usr/bin/bash
 
-_DC=$( which docker-compose )
 _DATA="./data"
+
+declare -a _DC
+
+mi_detect_compose() {
+	if [ -n "${COMPOSE_CMD:-}" ]; then
+		read -r -a _DC <<< "${COMPOSE_CMD}"
+	elif command -v podman >/dev/null 2>&1; then
+		_DC=(podman compose)
+	elif command -v docker >/dev/null 2>&1; then
+		_DC=(docker compose)
+	elif command -v docker-compose >/dev/null 2>&1; then
+		_DC=(docker-compose)
+	elif command -v podman-compose >/dev/null 2>&1; then
+		_DC=(podman-compose)
+	else
+		echo "[ ! ] No Compose implementation found." >&2
+		echo "      Install Podman or Docker, or set COMPOSE_CMD explicitly." >&2
+		exit 1
+	fi
+
+	if ! command -v "${_DC[0]}" >/dev/null 2>&1; then
+		echo "[ ! ] Compose command not found: ${_DC[0]}" >&2
+		exit 1
+	fi
+}
+
+dc() {
+	"${_DC[@]}" "$@"
+}
+
+mi_detect_compose
 
 # START INSTANCE
 mi_start() {
-	${_DC} up -d
+	dc up -d
 	sleep 10
-	${_DC} up -d nginx-proxy
+	dc up -d nginx-proxy
 }
 
 # STOP INSTANCE
 mi_stop() {
-	${_DC} down
+	dc down
 }
 
 # RESTART INSTANCE
 mi_restart() {
-	${_DC} down
+	dc down
 	sleep 5
-	${_DC} up -d
+	dc up -d
 	sleep 10
-	${_DC} up -d nginx-proxy
+	dc up -d nginx-proxy
 }
 
 # WIPE INSTANCE
 mi_wipe() {
 	echo ""
-	${_DC} down
+	dc down
 	rm -rf ${_DATA} && mkdir ${_DATA}
 	touch ${_DATA}.placeholder
 	touch .env/app.env
@@ -41,22 +71,22 @@ mi_wipe() {
 # BACKUP DATABASE
 mi_backup_pg() {
 	mkdir -p ${_DATA}/backup
-	${_DC} exec -it postgresql pg_dumpall -U mastodon > ${_DATA}/backup/data.sql
+	dc exec -it postgresql pg_dumpall -U mastodon > ${_DATA}/backup/data.sql
 }
 
 # RESTORE DATABASE
 mi_restore_pg() {
-	${_DC} exec -iT postgresql psql -U mastodon < ${_DATA}/backup/data.sql
+	dc exec -iT postgresql psql -U mastodon < ${_DATA}/backup/data.sql
 }
 
 # UPGRADE POSTGRESQL
 mi_upgrade_pg() {
 	mi_backup_pg
-	${_DC} down
+	dc down
 	sleep 5
-	${_DC} up postgresql -d
+	dc up postgresql -d
 	mi_restore_pg
-	${_DC} up -d
+	dc up -d
 }
 
 # UPDATE MASTODON
@@ -64,13 +94,13 @@ mi_update() {
 	echo "" > .env
 	echo "MASTODON_VER=\"$1\"" >> .env
 
-	${_DC} down
-	${_DC} pull web streaming sidekiq control
-	${_DC} run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
-	${_DC} up -d postgresql redis redis-cache elasticsearch
+	dc down
+	dc pull web streaming sidekiq control
+	dc run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
+	dc up -d postgresql redis redis-cache elasticsearch
 	sleep 10
-	${_DC} run --rm control bundle exec rake db:migrate
-	${_DC} up -d
+	dc run --rm control bundle exec rake db:migrate
+	dc up -d
 	echo "[i] Update complete. You might want to run 'docker-compose run --rm control bin/tootctl search deploy'.";
 }
 
@@ -86,7 +116,7 @@ mi_prepare() {
 	MASTODON_ADMIN_USERNAME="$2"
 	MASTODON_ADMIN_EMAIL="$3"
 
-	${_DC} down
+	dc down
 
 	echo "[ i ] Preparing instance ${DOMAIN}..."
 
@@ -184,10 +214,10 @@ mi_prepare() {
 
 	# Copy static files
 	echo "[ i ] Copying static files..."
-	${_DC} run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
+	dc run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
 
 	# Prepare PostgreSQL database
-	${_DC} up -d postgresql redis redis-cache elasticsearch
+	dc up -d postgresql redis redis-cache elasticsearch
 	echo "[ i ] Waiting for database..."
 	sleep 20
 
@@ -197,16 +227,16 @@ mi_prepare() {
 		echo "Provisioning not required"
 	else
 
-		${_DC} run --rm control bundle exec rake db:migrate
+		dc run --rm control bundle exec rake db:migrate
 
-		${_DC} run --rm control bin/tootctl search deploy
-		${_DC} run --rm control bin/tootctl accounts create $MASTODON_ADMIN_USERNAME --email $MASTODON_ADMIN_EMAIL --confirmed --role Owner
+		dc run --rm control bin/tootctl search deploy
+		dc run --rm control bin/tootctl accounts create $MASTODON_ADMIN_USERNAME --email $MASTODON_ADMIN_EMAIL --confirmed --role Owner
 
 		echo "[ i ] Provisioning done. Check env/app.env for additional configuration."
 		touch "$CHECK"
 	fi
 
-	${_DC} up -d
+	dc up -d
 }
 
 # CONTROL

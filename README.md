@@ -4,6 +4,12 @@ Dockerized Mastodon instance - multiple instances behind master front proxy
 (and/or behind cascading proxies). Optimized for Joutsen Bulwark environment
 running Podman on Linux.
 
+`control.sh` prefers `podman compose` when Podman is installed. The Compose
+implementation can be overridden for any command, for example with
+`COMPOSE_CMD="docker compose" ./control.sh start`,
+`COMPOSE_CMD=docker-compose ./control.sh start`, or
+`COMPOSE_CMD=podman-compose ./control.sh start`.
+
 **Usage:**
 
 - Create a new instance
