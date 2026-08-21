@@ -15,7 +15,7 @@ implementation can be overridden for any command, for example with
 - Create a new instance
 `./control.sh init <domain.tld> <admin_username> <admin-email>`
 
-- Remove everything
+- Remove application data and generated configuration (backups are preserved)
 `./control.sh wipe`
 
 - Start instance
@@ -53,4 +53,4 @@ override the image chosen by either backend.
 Run
 `./control.sh compose run --rm control bin/rails db:encryption:init`
 
-and insert newly generated keys to your `.env/app.env` first.
+and insert newly generated keys to your `env/app.env` first.

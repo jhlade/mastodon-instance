@@ -122,16 +122,15 @@ mi_restart() {
 
 # WIPE INSTANCE
 mi_wipe() {
-	echo ""
 	dc down
-	rm -rf ${_DATA} && mkdir ${_DATA}
-	touch ${_DATA}.placeholder
-	touch .env/app.env
-	touch .env/db.env
-	echo "" > ./env/app.env
-	echo "" > ./env/db.env
-	touch ./env/smtp.env
-	chmod 0600 ./env/smtp.env
+	rm -rf -- "${_DATA}"
+	mkdir -p "${_DATA}" ./env
+	touch "${_DATA}/.placeholder"
+	: > ./env/app.env
+	: > ./env/db.env
+	: > ./env/smtp.env
+	chmod 0600 ./env/app.env ./env/db.env ./env/smtp.env
+	echo "[ i ] Instance data and generated configuration removed."
 }
 
 # BACKUP DATABASE
@@ -193,13 +192,14 @@ mi_search_backend() {
 mi_update() {
 	mi_set_env_value MASTODON_VER "\"$1\""
 
-	dc down
+	echo "[ i ] Pulling Mastodon $1..."
 	dc pull web streaming sidekiq control
-	dc run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
 	dc up -d postgresql redis redis-cache elasticsearch
 	sleep 10
+	dc run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
 	echo "[ i ] Running pre-deployment database migrations..."
 	dc run --rm -e SKIP_POST_DEPLOYMENT_MIGRATIONS=true control bundle exec rails db:migrate
+	echo "[ i ] Restarting Mastodon services..."
 	dc up -d
 	echo "[ i ] Running post-deployment database migrations..."
 	dc run --rm control bundle exec rails db:migrate
@@ -350,6 +350,9 @@ case "${1:-}" in
   restart)
 		mi_restart
     ;;
+  wipe)
+		mi_wipe
+	;;
   update)
   		[ $# -ne 2 ] && { echo "Usage: $0 update <mastodon version>"; exit 1; }
   		mi_update "$2"
