@@ -24,6 +24,13 @@ implementation can be overridden for any command, for example with
 - Stop instance
 `./control.sh stop`
 
+- Back up PostgreSQL
+`./control.sh backup`
+
+Backups are written in PostgreSQL custom format to `backup/YYYY-MM-DD.dump`.
+The command refuses to overwrite an existing backup. Set `BACKUP_DIR` to use
+a different destination.
+
 - Update to specific tag
 `./control.sh update <new mastodon version, ie. v4.7.0>`
 

@@ -1,4 +1,5 @@
 data/
+backup/
 !data/.placeholder
 db.env
 app.env

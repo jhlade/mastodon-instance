@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 
 _DATA="./data"
+_BACKUP_DIR="${BACKUP_DIR:-./backup}"
 _PROJECT_ENV="./.env"
 
 declare -a _DC
@@ -135,23 +136,26 @@ mi_wipe() {
 
 # BACKUP DATABASE
 mi_backup_pg() {
-	mkdir -p ${_DATA}/backup
-	dc exec -it postgresql pg_dumpall -U mastodon > ${_DATA}/backup/data.sql
-}
+	local backup_file="${_BACKUP_DIR}/$(date +%F).dump"
+	local temporary_file
 
-# RESTORE DATABASE
-mi_restore_pg() {
-	dc exec -iT postgresql psql -U mastodon < ${_DATA}/backup/data.sql
-}
+	mkdir -p "${_BACKUP_DIR}"
+	chmod 0700 "${_BACKUP_DIR}"
 
-# UPGRADE POSTGRESQL
-mi_upgrade_pg() {
-	mi_backup_pg
-	dc down
-	sleep 5
-	dc up postgresql -d
-	mi_restore_pg
-	dc up -d
+	if [ -e "${backup_file}" ]; then
+		echo "[ ! ] Backup already exists: ${backup_file}" >&2
+		return 1
+	fi
+
+	temporary_file=$(mktemp "${_BACKUP_DIR}/.mastodon-backup.XXXXXX")
+	echo "[ i ] Backing up PostgreSQL to ${backup_file}..."
+	if dc exec -T postgresql sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' > "${temporary_file}"; then
+		mv "${temporary_file}" "${backup_file}"
+		echo "[ i ] Backup complete: ${backup_file}"
+	else
+		rm -f "${temporary_file}"
+		return 1
+	fi
 }
 
 # SWITCH SEARCH BACKEND
@@ -208,7 +212,7 @@ mi_update() {
 mi_prepare() {
 
 	# structure
-	mkdir -p ${_DATA}/{web,postgresql,redis,backup}
+	mkdir -p ${_DATA}/{web,postgresql,redis}
 	mkdir -p "${_DATA}/${_SEARCH_BACKEND}"
 	mkdir -p ${_DATA}/web/{assets,system}
 	chown -R 991:991 ${_DATA}/web
