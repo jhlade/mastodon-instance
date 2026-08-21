@@ -27,8 +27,19 @@ implementation can be overridden for any command, for example with
 - Update to specific tag
 `./control.sh update <new mastodon version, ie. v4.3.6>`
 
+- Switch between Elasticsearch and OpenSearch
+`./control.sh search <elasticsearch|opensearch>`
+
+The selected search backend is stored as `SEARCH_BACKEND` in `.env`. Both
+backends keep their indexes in separate data directories, and the switch
+command deploys a fresh index automatically. `SEARCH_IMAGE` can be used to
+override the image chosen by either backend.
+
+- Pass a command to the selected Compose implementation
+`./control.sh compose <arguments...>`
+
 **Update to 4.3.0 from 4.2.x:**
 Run
-`docker-compose run --rm control bin/rails db:encryption:init`
+`./control.sh compose run --rm control bin/rails db:encryption:init`
 
 and insert newly generated keys to your `.env/app.env` first.

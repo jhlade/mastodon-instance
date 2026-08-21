@@ -48,17 +48,11 @@ services:
       - internal_network
 
   elasticsearch:
+    # Image-specific settings and data paths are in the backend override files.
     restart: always
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
     environment:
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.license.self_generated.type=basic
-      - xpack.security.enabled=true
-      - xpack.watcher.enabled=false
-      - xpack.graph.enabled=false
-      - xpack.ml.enabled=false
       - bootstrap.memory_lock=true
-      - cluster.name=elasticsearch-mastodon
+      - cluster.name=mastodon-search
       - discovery.type=single-node
       - thread_pool.write.queue_size=1000
     env_file:
@@ -67,8 +61,6 @@ services:
        - internal_network
     healthcheck:
        test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
-    volumes:
-       - ./data/elasticsearch:/usr/share/elasticsearch/data
     ulimits:
       memlock:
         soft: -1
@@ -155,4 +147,3 @@ networks:
   external_network:
   internal_network:
     internal: true
-

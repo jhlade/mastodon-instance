@@ -1,0 +1,13 @@
+---
+services:
+  elasticsearch:
+    image: '${SEARCH_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch:8.15.0}'
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.license.self_generated.type=basic
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+      - xpack.graph.enabled=false
+      - xpack.ml.enabled=false
+    volumes:
+      - ./data/elasticsearch:/usr/share/elasticsearch/data

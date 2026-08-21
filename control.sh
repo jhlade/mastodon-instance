@@ -1,8 +1,70 @@
 #!/usr/bin/bash
 
 _DATA="./data"
+_PROJECT_ENV="./.env"
 
 declare -a _DC
+declare -a _COMPOSE_FILES
+
+mi_env_value() {
+	local key="$1"
+	local value=""
+
+	if [ -f "${_PROJECT_ENV}" ]; then
+		value=$(sed -n "s/^${key}=//p" "${_PROJECT_ENV}" | tail -n 1)
+		value="${value#\"}"
+		value="${value%\"}"
+	fi
+
+	printf '%s' "${value}"
+}
+
+mi_set_env_value() {
+	local key="$1"
+	local value="$2"
+	local temporary_file
+
+	touch "${_PROJECT_ENV}"
+	temporary_file=$(mktemp "${_PROJECT_ENV}.XXXXXX")
+	awk -v key="${key}" -v value="${value}" '
+		BEGIN { found = 0 }
+		index($0, key "=") == 1 {
+			if (!found) {
+				print key "=" value
+				found = 1
+			}
+			next
+		}
+		{ print }
+		END {
+			if (!found) print key "=" value
+		}
+	' "${_PROJECT_ENV}" > "${temporary_file}"
+	mv "${temporary_file}" "${_PROJECT_ENV}"
+}
+
+mi_configure_search_backend() {
+	local backend="${1:-elasticsearch}"
+	local backend_file="./docker-compose.${backend}.yml"
+
+	case "${backend}" in
+		elasticsearch|opensearch)
+			;;
+		*)
+			echo "[ ! ] Unsupported search backend: ${backend}" >&2
+			echo "      Use elasticsearch or opensearch." >&2
+			exit 1
+			;;
+	esac
+
+	if [ ! -f "${backend_file}" ]; then
+		echo "[ ! ] Missing Compose configuration: ${backend_file}" >&2
+		exit 1
+	fi
+
+	_SEARCH_BACKEND="${backend}"
+	_COMPOSE_FILES=(-f ./docker-compose.yml -f "${backend_file}")
+}
 
 mi_detect_compose() {
 	if [ -n "${COMPOSE_CMD:-}" ]; then
@@ -28,10 +90,11 @@ mi_detect_compose() {
 }
 
 dc() {
-	"${_DC[@]}" "$@"
+	"${_DC[@]}" "${_COMPOSE_FILES[@]}" "$@"
 }
 
 mi_detect_compose
+mi_configure_search_backend "${SEARCH_BACKEND:-$(mi_env_value SEARCH_BACKEND)}"
 
 # START INSTANCE
 mi_start() {
@@ -89,10 +152,40 @@ mi_upgrade_pg() {
 	dc up -d
 }
 
+# SWITCH SEARCH BACKEND
+mi_search_backend() {
+	local backend="$1"
+
+	case "${backend}" in
+		elasticsearch|opensearch)
+			;;
+		*)
+			echo "[ ! ] Unsupported search backend: ${backend}" >&2
+			echo "      Use elasticsearch or opensearch." >&2
+			exit 1
+			;;
+	esac
+
+	if [ "${backend}" = "${_SEARCH_BACKEND}" ]; then
+		echo "[ i ] Search backend is already ${backend}."
+		return
+	fi
+
+	echo "[ i ] Switching search backend from ${_SEARCH_BACKEND} to ${backend}..."
+	dc stop elasticsearch
+	mi_set_env_value SEARCH_BACKEND "\"${backend}\""
+	mi_configure_search_backend "${backend}"
+	mkdir -p "${_DATA}/${backend}"
+	dc up -d elasticsearch
+	echo "[ i ] Waiting for ${backend}..."
+	sleep 20
+	dc run --rm control bin/tootctl search deploy
+	echo "[ i ] Search backend switched to ${backend}."
+}
+
 # UPDATE MASTODON
 mi_update() {
-	echo "" > .env
-	echo "MASTODON_VER=\"$1\"" >> .env
+	mi_set_env_value MASTODON_VER "\"$1\""
 
 	dc down
 	dc pull web streaming sidekiq control
@@ -108,7 +201,8 @@ mi_update() {
 mi_prepare() {
 
 	# structure
-	mkdir -p ${_DATA}/{web,elasticsearch,postgresql,redis,backup}
+	mkdir -p ${_DATA}/{web,postgresql,redis,backup}
+	mkdir -p "${_DATA}/${_SEARCH_BACKEND}"
 	mkdir -p ${_DATA}/web/{assets,system}
 	chown -R 991:991 ${_DATA}/web
 
@@ -141,21 +235,16 @@ mi_prepare() {
 	echo "REDIS_PORT=6379" >> ./env/db.env
 	echo "CACHE_REDIS_HOST=redis-cache" >> ./env/db.env
 	echo "CACHE_REDIS_PORT=6379" >> ./env/db.env
-	# elasticsearch
-	echo "ES_JAVA_OPTS='-Xms512m -Xmx512m'" >> ./env/db.env
+	# Elasticsearch-compatible search backend
 	echo "ES_ENABLED=true" >> ./env/db.env
 	echo "ES_HOST=elasticsearch" >> ./env/db.env
 	echo "ES_PORT=9200" >> ./env/db.env
-	echo "ES_USER=elastic" >> ./env/db.env
 
 	# generate passwords
 	__PWD_PG=$( openssl rand -hex 16 )
-	__PWD_ES=$( openssl rand -hex 16 )
 
 	echo "POSTGRES_PASSWORD=${__PWD_PG}" >> ./env/db.env
 	echo "DB_PASS=${__PWD_PG}" >> ./env/db.env
-	echo "ELASTIC_PASSWORD=${__PWD_ES}" >> ./env/db.env
-	echo "ES_PASS=${__PWD_ES}" >> ./env/db.env
 
 	[ ! -s ./env/db.env ] && { echo "[ ! ] Failed to create database environment file."; exit 1; }
 	echo "[ i ] Database environment file created."
@@ -257,6 +346,15 @@ case "$1" in
   backup)
   		mi_backup_pg
     ;;
+  search)
+		[ $# -ne 2 ] && { echo "Usage: $0 search <elasticsearch|opensearch>"; exit 1; }
+		mi_search_backend "$2"
+    ;;
+  compose)
+		shift
+		[ $# -eq 0 ] && { echo "Usage: $0 compose <arguments...>"; exit 1; }
+		dc "$@"
+    ;;
   init)
         [ $# -ne 4 ] && { echo "Usage: $0 init <my-domain.tld> <admin_username> <admin-email@domain.tld>"; exit 1; }
   		mi_prepare "$2" "$3" "$4"
@@ -266,7 +364,7 @@ case "$1" in
   		mi_prepare "$2" "$3" "$4"
   	;;
   *)
-  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|init|backup}"
+  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|search <elasticsearch|opensearch>|compose <arguments...>|init|backup}"
   exit 1
   ;;
 esac
