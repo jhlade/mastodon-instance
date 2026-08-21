@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -Eeuo pipefail
+
 _DATA="./data"
 _PROJECT_ENV="./.env"
 
@@ -192,9 +194,14 @@ mi_update() {
 	dc run --rm -u root control bash -c "cp -r /mastodon/public/* /web/"
 	dc up -d postgresql redis redis-cache elasticsearch
 	sleep 10
-	dc run --rm control bundle exec rake db:migrate
+	echo "[ i ] Running pre-deployment database migrations..."
+	dc run --rm -e SKIP_POST_DEPLOYMENT_MIGRATIONS=true control bundle exec rails db:migrate
 	dc up -d
-	echo "[i] Update complete. You might want to run 'docker-compose run --rm control bin/tootctl search deploy'.";
+	echo "[ i ] Running post-deployment database migrations..."
+	dc run --rm control bundle exec rails db:migrate
+	echo "[ i ] Deploying the search index..."
+	dc run --rm control bin/tootctl search deploy
+	echo "[ i ] Update complete."
 }
 
 # PREPARE INSTANCE
@@ -329,7 +336,7 @@ mi_prepare() {
 }
 
 # CONTROL
-case "$1" in
+case "${1:-}" in
   start)
     	mi_start
     ;;

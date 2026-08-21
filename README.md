@@ -25,7 +25,11 @@ implementation can be overridden for any command, for example with
 `./control.sh stop`
 
 - Update to specific tag
-`./control.sh update <new mastodon version, ie. v4.3.6>`
+`./control.sh update <new mastodon version, ie. v4.7.0>`
+
+The update command runs pre-deployment migrations with
+`SKIP_POST_DEPLOYMENT_MIGRATIONS=true`, restarts the application, runs the
+post-deployment migrations, and deploys the search index.
 
 - Switch between Elasticsearch and OpenSearch
 `./control.sh search <elasticsearch|opensearch>`
