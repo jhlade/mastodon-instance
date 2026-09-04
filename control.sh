@@ -201,7 +201,8 @@ mi_update() {
 	dc pull web streaming sidekiq control
 	dc up -d postgresql redis redis-cache elasticsearch
 	sleep 10
-	dc run --rm -u root control bash -c "find /mastodon/public/ -mindepth 1 -maxdepth 1 ! -name system -exec cp -r {} /web/ \\;"
+	dc run --rm -u root control bash -c "shopt -s extglob
+cp -r /mastodon/public/!(system) /web/"
 	echo "[ i ] Running pre-deployment database migrations..."
 	dc run --rm -e SKIP_POST_DEPLOYMENT_MIGRATIONS=true control bundle exec rails db:migrate
 	echo "[ i ] Restarting Mastodon services..."
@@ -319,7 +320,8 @@ mi_prepare() {
 
 	# Copy static files
 	echo "[ i ] Copying static files..."
-	dc run --rm -u root control bash -c "find /mastodon/public/ -mindepth 1 -maxdepth 1 ! -name system -exec cp -r {} /web/ \\;"
+	dc run --rm -u root control bash -c "shopt -s extglob
+cp -r /mastodon/public/!(system) /web/"
 
 	# Prepare PostgreSQL database
 	dc up -d postgresql redis redis-cache elasticsearch
