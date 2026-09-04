@@ -213,6 +213,8 @@ cp -r /mastodon/public/!(system) /web/"
 	dc run --rm -e SKIP_POST_DEPLOYMENT_MIGRATIONS=true control bundle exec rails db:migrate
 	echo "[ i ] Restarting Mastodon services..."
 	dc up -d
+	sleep 10
+	mi_refresh_nginx
 	echo "[ i ] Running post-deployment database migrations..."
 	dc run --rm control bundle exec rails db:migrate
 	echo "[ i ] Deploying the search index..."
