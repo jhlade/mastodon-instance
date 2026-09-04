@@ -104,11 +104,17 @@ dc() {
 mi_detect_compose
 mi_configure_search_backend "${SEARCH_BACKEND:-$(mi_env_value SEARCH_BACKEND)}"
 
+# REFRESH NGINX-PROXY (re-resolve web/streaming upstream DNS)
+mi_refresh_nginx() {
+	echo "[ i ] Restarting nginx-proxy to refresh upstream DNS..."
+	dc restart nginx-proxy
+}
+
 # START INSTANCE
 mi_start() {
 	dc up -d
 	sleep 10
-	dc up -d nginx-proxy
+	mi_refresh_nginx
 }
 
 # STOP INSTANCE
@@ -122,7 +128,7 @@ mi_restart() {
 	sleep 5
 	dc up -d
 	sleep 10
-	dc up -d nginx-proxy
+	mi_refresh_nginx
 }
 
 # WIPE INSTANCE
