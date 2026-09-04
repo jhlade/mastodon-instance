@@ -72,24 +72,28 @@ mi_configure_search_backend() {
 mi_detect_compose() {
 	if [ -n "${COMPOSE_CMD:-}" ]; then
 		read -r -a _DC <<< "${COMPOSE_CMD}"
-	elif command -v podman >/dev/null 2>&1; then
-		_DC=(podman compose)
-	elif command -v docker >/dev/null 2>&1; then
-		_DC=(docker compose)
-	elif command -v docker-compose >/dev/null 2>&1; then
-		_DC=(docker-compose)
-	elif command -v podman-compose >/dev/null 2>&1; then
-		_DC=(podman-compose)
-	else
-		echo "[ ! ] No Compose implementation found." >&2
-		echo "      Install Podman or Docker, or set COMPOSE_CMD explicitly." >&2
-		exit 1
+
+		if ! command -v "${_DC[0]}" >/dev/null 2>&1; then
+			echo "[ ! ] Compose command not found: ${_DC[0]}" >&2
+			exit 1
+		fi
+
+		return
 	fi
 
-	if ! command -v "${_DC[0]}" >/dev/null 2>&1; then
-		echo "[ ! ] Compose command not found: ${_DC[0]}" >&2
-		exit 1
-	fi
+	# prefer Podman when present
+	local candidate
+	for candidate in "podman compose" "docker compose" "docker-compose" "podman-compose"; do
+		read -r -a _DC <<< "${candidate}"
+		if command -v "${_DC[0]}" >/dev/null 2>&1 && "${_DC[@]}" version >/dev/null 2>&1; then
+			return
+		fi
+	done
+
+	echo "[ ! ] No working Compose implementation found." >&2
+	echo "      Tried: podman compose, docker compose, docker-compose, podman-compose." >&2
+	echo "      Install Podman or Docker, or set COMPOSE_CMD explicitly." >&2
+	exit 1
 }
 
 dc() {
