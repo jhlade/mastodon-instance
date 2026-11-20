@@ -204,7 +204,7 @@ mi_update() {
 	mi_set_env_value MASTODON_VER "\"$1\""
 
 	echo "[ i ] Pulling Mastodon $1..."
-	dc pull web streaming sidekiq control
+	dc pull web streaming sidekiq control nginx-proxy
 	dc up -d postgresql redis redis-cache elasticsearch
 	sleep 10
 	dc run --rm -u root control bash -c "shopt -s extglob

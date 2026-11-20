@@ -49,6 +49,12 @@ override the image chosen by either backend.
 - Pass a command to the selected Compose implementation
 `./control.sh compose <arguments...>`
 
+**Proxy template (nginx >= 1.27.3):**
+`conf/nginx.conf` is rendered by the nginx image entrypoint as a template and
+resolves `web` and `streaming` at runtime, so the proxy follows containers
+whose address changed after a restart. To apply it on an existing instance run
+`./control.sh compose pull nginx-proxy` and `./control.sh restart`.
+
 **Update to 4.3.0 from 4.2.x:**
 Run
 `./control.sh compose run --rm control bin/rails db:encryption:init`
