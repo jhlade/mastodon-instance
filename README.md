@@ -46,6 +46,22 @@ backends keep their indexes in separate data directories, and the switch
 command deploys a fresh index automatically. `SEARCH_IMAGE` can be used to
 override the image chosen by either backend.
 
+- Check federation health
+`./control.sh fedcheck [--quiet]`
+
+Mastodon marks a server unavailable after delivery failures on 7 different
+days and then silently stops delivering to it until that server sends
+something back, which can leave followers without posts for months. The check
+reports such servers that host followers of local accounts (and tests whether
+they actually respond), servers with failures on 3 or more days, a stale
+availability cache, and Sidekiq processes, queue latency and retries. It exits
+with status 1 when action is needed; `--quiet` prints nothing when all is well,
+so it fits cron (run from the instance directory), for example:
+`0 7 * * * cd /srv/mastodon-instance && ./control.sh fedcheck --quiet`
+
+- Restart delivery to a server marked unavailable
+`./control.sh fedreset <domain>`
+
 - Pass a command to the selected Compose implementation
 `./control.sh compose <arguments...>`
 

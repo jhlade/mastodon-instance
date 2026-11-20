@@ -222,6 +222,101 @@ cp -r /mastodon/public/!(system) /web/"
 	echo "[ i ] Update complete."
 }
 
+# FEDERATION HEALTH CHECK
+# Mastodon marks a server unavailable after delivery failures on 7 different
+# days and then silently skips it until that server sends something back.
+# Report such servers that host followers of local accounts, early warnings,
+# a stale availability cache and Sidekiq health. Exits 1 when action is needed.
+mi_fedcheck_rb() {
+	cat <<'RUBY'
+require "sidekiq/api"
+
+quiet = ARGV.include?("quiet")
+Rails.logger.level = Logger::WARN
+(Sidekiq.respond_to?(:default_configuration) ? Sidekiq.default_configuration.logger : Sidekiq.logger).level = Logger::WARN
+
+WARN_DAYS = 3
+threshold = DeliveryFailureTracker::FAILURE_THRESHOLDS[:days]
+out = []
+problems = 0
+report = lambda do |level, message|
+  problems += 1 if level == "!"
+  out << "[ #{level} ] #{message}"
+end
+
+def alive?(host)
+  Request.new(:get, "https://#{host}/.well-known/nodeinfo").perform do |response|
+    [response.code < 500, "HTTP #{response.code}"]
+  end
+rescue => e
+  [false, "#{e.class.name.demodulize}: #{e.message.to_s.lines.first.to_s.strip[0, 80]}"]
+end
+
+# Inbox hosts of remote followers of local accounts, with follower counts
+follower_ids = Follow.where(target_account_id: Account.local.select(:id)).select(:account_id)
+hosts = Account.remote.where(id: follower_ids).pluck(:shared_inbox_url, :inbox_url).filter_map do |shared, inbox|
+  url = shared.presence || inbox.presence
+  url && (Addressable::URI.parse(url).normalized_host rescue nil)
+end.tally
+
+unavailable = UnavailableDomain.pluck(:domain).sort
+report.call("i", "#{Rails.configuration.x.local_domain}: followers on #{hosts.size} server(s), #{unavailable.size} server(s) marked unavailable")
+
+cached = Rails.cache.read("unavailable_domains")
+if cached && cached.keys.sort != unavailable
+  report.call("!", "stale cache unavailable_domains (cache: #{cached.keys.sort.join(", ")}; db: #{unavailable.join(", ")}) -> ./control.sh fedreset <domain>")
+end
+
+unavailable.each do |domain|
+  next unless hosts.key?(domain)
+
+  ok, detail = alive?(domain)
+  if ok
+    report.call("!", "#{domain}: marked unavailable, #{hosts[domain]} follower(s) receive nothing, but the server responds (#{detail}) -> ./control.sh fedreset #{domain}")
+  else
+    report.call("i", "#{domain}: marked unavailable, #{hosts[domain]} follower(s), server down (#{detail})")
+  end
+end
+
+DeliveryFailureTracker.warning_domains_map(hosts.keys).sort_by { |_, days| -days }.each do |domain, days|
+  ok, detail = alive?(domain)
+  level = ok && days >= WARN_DAYS ? "!" : "i"
+  report.call(level, "#{domain}: delivery failures on #{days}/#{threshold} day(s), #{hosts[domain]} follower(s), server #{ok ? "responds" : "down"} (#{detail})")
+end
+
+processes = Sidekiq::ProcessSet.new.size
+report.call("!", "no Sidekiq process is running") if processes.zero?
+%w(push ingress default).each do |queue|
+  latency = Sidekiq::Queue.new(queue).latency
+  report.call("!", "Sidekiq queue #{queue} is #{latency.round}s behind") if latency > 600
+end
+stats = Sidekiq::Stats.new
+report.call("i", "Sidekiq: processes=#{processes} enqueued=#{stats.enqueued} retry=#{stats.retry_size} dead=#{stats.dead_size}")
+Sidekiq::RetrySet.new.select { |job| job.klass == "ActivityPub::DeliveryWorker" }
+  .map { |job| Addressable::URI.parse(job.args[2].to_s).normalized_host rescue "?" }
+  .tally.max_by(5) { |_, count| count }
+  .each { |host, count| report.call("i", "  retrying #{count} deliveries to #{host}") }
+
+puts out unless quiet && problems.zero?
+exit(problems.zero? ? 0 : 1)
+RUBY
+}
+
+mi_fedcheck() {
+	dc exec -T web bin/rails runner "$(mi_fedcheck_rb)" "$@"
+}
+
+# RESTART DELIVERY TO A SERVER MARKED UNAVAILABLE
+mi_fedreset() {
+	dc exec -T web bin/rails runner '
+domain = ARGV.first.to_s.downcase
+was_unavailable = UnavailableDomain.exists?(domain: domain)
+DeliveryFailureTracker.reset!(domain)
+Rails.cache.delete("unavailable_domains")
+puts "[ i ] #{domain}: #{was_unavailable ? "delivery restarted" : "failure counter cleared"}, availability cache refreshed"
+' "$1"
+}
+
 # PREPARE INSTANCE
 mi_prepare() {
 
@@ -379,6 +474,17 @@ case "${1:-}" in
 		[ $# -ne 2 ] && { echo "Usage: $0 search <elasticsearch|opensearch>"; exit 1; }
 		mi_search_backend "$2"
     ;;
+  fedcheck)
+		case "${2:-}" in
+			"") mi_fedcheck ;;
+			-q|--quiet) mi_fedcheck quiet ;;
+			*) echo "Usage: $0 fedcheck [--quiet]"; exit 1 ;;
+		esac
+	;;
+  fedreset)
+		[ $# -ne 2 ] && { echo "Usage: $0 fedreset <domain>"; exit 1; }
+		mi_fedreset "$2"
+	;;
   compose)
 		shift
 		[ $# -eq 0 ] && { echo "Usage: $0 compose <arguments...>"; exit 1; }
@@ -393,7 +499,7 @@ case "${1:-}" in
   		mi_prepare "$2" "$3" "$4"
   	;;
   *)
-  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|search <elasticsearch|opensearch>|compose <arguments...>|init|backup}"
+  echo "Usage: $0 {start|stop|restart|wipe|update <mastodon version>|search <elasticsearch|opensearch>|fedcheck [--quiet]|fedreset <domain>|compose <arguments...>|init|backup}"
   exit 1
   ;;
 esac
